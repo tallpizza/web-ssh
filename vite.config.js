@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     port: 8020,
     host: '0.0.0.0', // Allow access from any origin
-    cors: true
+    cors: true,
+    allowedHosts: ['localhost', 'macmini', '.local', '.taild233e3.ts.net'] // Allow macmini and other hosts
   }
 })
