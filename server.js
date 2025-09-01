@@ -29,7 +29,6 @@ function startTtyd() {
     '-t', 'titleFixed=Web SSH Terminal',
     '-s', '2', // SIGINT on exit
     '-P', '10', // Ping interval
-    '-o', // Allow origin
     '/bin/zsh'  // Changed to zsh
   ];
 
