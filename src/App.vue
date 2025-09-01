@@ -1,36 +1,176 @@
 <template>
-  <div class="terminal-container">
+  <div class="terminal-container" :style="containerStyle">
     <iframe 
       ref="terminalFrame"
       class="terminal-iframe"
       :src="terminalUrl"
       frameborder="0"
+      scrolling="no"
+      @load="onIframeLoad"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 
 const terminalFrame = ref(null)
 const terminalUrl = ref('')
+const viewportHeight = ref(window.innerHeight)
+const keyboardHeight = ref(0)
+
+// Dynamic container height accounting for keyboard
+const containerStyle = computed(() => {
+  const height = viewportHeight.value - keyboardHeight.value
+  return {
+    height: `${height}px`
+  }
+})
+
+// Handle viewport resize (keyboard show/hide on mobile)
+const handleResize = () => {
+  const newHeight = window.innerHeight
+  const heightDiff = viewportHeight.value - newHeight
+  
+  // If height decreased by more than 100px, keyboard is likely open
+  if (heightDiff > 100) {
+    keyboardHeight.value = heightDiff
+  } else if (newHeight > viewportHeight.value - 50) {
+    // Keyboard likely closed
+    keyboardHeight.value = 0
+  }
+  
+  viewportHeight.value = newHeight
+}
+
+// Handle visual viewport changes (more accurate for mobile keyboards)
+const handleViewportChange = () => {
+  if (window.visualViewport) {
+    const vv = window.visualViewport
+    const keyboardOpen = vv.height < window.innerHeight
+    
+    if (keyboardOpen) {
+      keyboardHeight.value = window.innerHeight - vv.height
+      viewportHeight.value = vv.height
+    } else {
+      keyboardHeight.value = 0
+      viewportHeight.value = window.innerHeight
+    }
+  }
+}
+
+const onIframeLoad = () => {
+  // Try to inject mobile-friendly styles into the iframe
+  try {
+    if (terminalFrame.value && terminalFrame.value.contentWindow) {
+      const iframeDoc = terminalFrame.value.contentDocument || terminalFrame.value.contentWindow.document
+      
+      // Inject mobile-optimized styles
+      const style = iframeDoc.createElement('style')
+      style.textContent = `
+        * {
+          -webkit-tap-highlight-color: transparent !important;
+          -webkit-touch-callout: none !important;
+        }
+        
+        body {
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden !important;
+          overscroll-behavior: none !important;
+          touch-action: manipulation !important;
+        }
+        
+        #terminal {
+          height: 100% !important;
+          width: 100% !important;
+        }
+        
+        .xterm-viewport {
+          overflow: hidden !important;
+          overscroll-behavior: none !important;
+        }
+        
+        /* Adjust terminal font size for mobile */
+        @media (max-width: 768px) {
+          .xterm {
+            font-size: 14px !important;
+          }
+        }
+        
+        /* Prevent zoom on input focus */
+        input, textarea, select {
+          font-size: 16px !important;
+        }
+      `
+      iframeDoc.head.appendChild(style)
+      
+      // Prevent zoom on double-tap
+      let lastTouchEnd = 0
+      iframeDoc.addEventListener('touchend', function (event) {
+        const now = Date.now()
+        if (now - lastTouchEnd <= 300) {
+          event.preventDefault()
+        }
+        lastTouchEnd = now
+      }, false)
+    }
+  } catch (e) {
+    // Cross-origin restriction, can't modify iframe
+    console.log('Cannot modify iframe content due to cross-origin restrictions')
+  }
+}
 
 onMounted(() => {
   // Use the same host but ttyd port
   const protocol = window.location.protocol
   const hostname = window.location.hostname
   terminalUrl.value = `${protocol}//${hostname}:8021`
+  
+  // Listen for resize events
+  window.addEventListener('resize', handleResize)
+  
+  // Listen for visual viewport changes (better for mobile keyboards)
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', handleViewportChange)
+    window.visualViewport.addEventListener('scroll', handleViewportChange)
+  }
+  
+  // Prevent pull-to-refresh on mobile
+  document.body.addEventListener('touchmove', (e) => {
+    if (e.touches.length > 1) {
+      e.preventDefault()
+    }
+  }, { passive: false })
+  
+  // Set initial viewport height
+  viewportHeight.value = window.innerHeight
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', handleViewportChange)
+    window.visualViewport.removeEventListener('scroll', handleViewportChange)
+  }
 })
 </script>
 
 <style scoped>
 .terminal-container {
   width: 100vw;
-  height: 100vh;
+  width: 100dvw;
   background: #000;
   position: fixed;
   top: 0;
   left: 0;
+  right: 0;
+  overflow: hidden;
+  /* Prevent bouncing and scrolling */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: none;
 }
 
 .terminal-iframe {
@@ -38,5 +178,29 @@ onMounted(() => {
   height: 100%;
   border: none;
   display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Prevent scrolling within iframe */
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* Safe area support */
+@supports (padding: env(safe-area-inset-top)) {
+  .terminal-container {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Landscape mode adjustments */
+@media (orientation: landscape) and (max-height: 500px) {
+  .terminal-container {
+    height: 100vh !important;
+    height: 100dvh !important;
+  }
 }
 </style>
