@@ -86,44 +86,73 @@ onMounted(() => {
   const hostname = window.location.hostname
   terminalUrl.value = `${protocol}//${hostname}:8021`
   
-  // Prevent pull-to-refresh on mobile
-  document.body.addEventListener('touchmove', (e) => {
-    if (e.touches.length > 1) {
-      e.preventDefault()
-    }
-  }, { passive: false })
+  // Prevent ALL scrolling and touch movement
+  const preventScroll = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    return false
+  }
+  
+  // Block all scroll-related events
+  document.addEventListener('touchmove', preventScroll, { passive: false })
+  document.addEventListener('scroll', preventScroll, { passive: false })
+  window.addEventListener('scroll', preventScroll, { passive: false })
+  document.body.addEventListener('scroll', preventScroll, { passive: false })
+  
+  // Lock scroll position
+  window.scrollTo(0, 0)
+  document.body.scrollTop = 0
+  document.documentElement.scrollTop = 0
+  
+  // Prevent scrolling on window focus (keyboard appearance)
+  window.addEventListener('focus', () => {
+    window.scrollTo(0, 0)
+  }, true)
+  
+  // Reset scroll on any resize
+  window.addEventListener('resize', () => {
+    window.scrollTo(0, 0)
+    document.body.scrollTop = 0
+    document.documentElement.scrollTop = 0
+  })
 })
 </script>
 
 <style scoped>
 .terminal-container {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 100%;
-  background: transparent;
-  overflow: hidden;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  background: #000;
+  overflow: hidden !important;
   /* Prevent bouncing and scrolling */
-  overscroll-behavior: none;
-  -webkit-overflow-scrolling: touch;
-  touch-action: none;
+  overscroll-behavior: none !important;
+  overscroll-behavior-y: none !important;
+  -webkit-overflow-scrolling: none !important;
+  touch-action: none !important;
+  transform: translate3d(0, 0, 0); /* Force GPU acceleration */
 }
 
 .terminal-iframe {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
   border: none;
   display: block;
   background: #000;
   /* Prevent scrolling within iframe */
-  overflow: hidden;
-  overscroll-behavior: none;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0); /* Force GPU acceleration */
 }
 
 /* Safe area support - apply to iframe instead of container */
