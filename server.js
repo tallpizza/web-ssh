@@ -1,14 +1,6 @@
-const express = require('express');
 const { spawn } = require('child_process');
+const { exec } = require('child_process');
 const path = require('path');
-
-const app = express();
-const PORT = process.env.PORT || 8022; // Change to 8022 for API server
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', ttyd: ttydProcess ? 'running' : 'stopped' });
-});
 
 // Start ttyd process
 let ttydProcess = null;
@@ -46,19 +38,41 @@ function startTtyd() {
   });
 }
 
-// Start ttyd when server starts
-startTtyd();
+
+// Start Vite dev server
+function startViteServer() {
+  console.log('Starting Vite dev server on port 8020...');
+  const viteProcess = spawn('npm', ['run', 'dev'], {
+    stdio: 'inherit',
+    shell: true
+  });
+
+  viteProcess.on('error', (err) => {
+    console.error('Failed to start Vite:', err);
+  });
+
+  return viteProcess;
+}
 
 // Graceful shutdown
+let viteProcess = null;
+
 process.on('SIGINT', () => {
   console.log('\nShutting down...');
   if (ttydProcess) {
     ttydProcess.kill();
   }
+  if (viteProcess) {
+    viteProcess.kill();
+  }
   process.exit(0);
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`ttyd terminal available on http://localhost:8021`);
-});
+// Start everything
+console.log('Starting Web SSH Terminal...');
+startTtyd();
+viteProcess = startViteServer();
+
+console.log('Web SSH Terminal is running:');
+console.log('  Frontend: http://localhost:8020');
+console.log('  Terminal: http://localhost:8021');
