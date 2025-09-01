@@ -12,16 +12,30 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useKeyboardHeight } from './composables/useKeyboardHeight'
 
 const terminalFrame = ref(null)
 const terminalUrl = ref('')
-const keyboardHeight = ref(0)
+
+// Use the keyboard height composable
+const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight()
 
 // Compute container style based on keyboard height
-const containerStyle = computed(() => ({
-  height: keyboardHeight.value > 0 ? `calc(100% - ${keyboardHeight.value}px)` : '100%'
-}))
+const containerStyle = computed(() => {
+  if (keyboardHeight.value > 0) {
+    // When keyboard is open, shrink terminal to fit above it
+    return {
+      height: `calc(100vh - ${keyboardHeight.value}px)`,
+      maxHeight: `calc(100vh - ${keyboardHeight.value}px)`
+    }
+  }
+  // Full screen when keyboard is closed
+  return {
+    height: '100vh',
+    maxHeight: '100vh'
+  }
+})
 
 
 const onIframeLoad = () => {
@@ -86,36 +100,11 @@ const onIframeLoad = () => {
   }
 }
 
-// Detect keyboard height
-const detectKeyboard = () => {
-  if (window.visualViewport) {
-    const windowHeight = window.innerHeight
-    const viewportHeight = window.visualViewport.height
-    const kbHeight = windowHeight - viewportHeight
-    
-    // Only update if there's a significant change (keyboard showing/hiding)
-    if (kbHeight > 50) {
-      keyboardHeight.value = kbHeight
-    } else {
-      keyboardHeight.value = 0
-    }
-  }
-}
-
 onMounted(() => {
   // Use the same host but ttyd port
   const protocol = window.location.protocol
   const hostname = window.location.hostname
   terminalUrl.value = `${protocol}//${hostname}:8021`
-  
-  // Detect keyboard on viewport changes
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', detectKeyboard)
-    window.visualViewport.addEventListener('scroll', detectKeyboard)
-  }
-  
-  // Also listen to regular resize
-  window.addEventListener('resize', detectKeyboard)
   
   // Prevent scrolling
   const preventScroll = (e) => {
@@ -128,14 +117,11 @@ onMounted(() => {
   
   // Keep at top
   window.scrollTo(0, 0)
-})
-
-onUnmounted(() => {
-  if (window.visualViewport) {
-    window.visualViewport.removeEventListener('resize', detectKeyboard)
-    window.visualViewport.removeEventListener('scroll', detectKeyboard)
+  
+  // Log keyboard state for debugging
+  if (isKeyboardOpen.value) {
+    console.log('Keyboard is open, height:', keyboardHeight.value)
   }
-  window.removeEventListener('resize', detectKeyboard)
 })
 </script>
 
