@@ -1,5 +1,5 @@
 <template>
-  <div class="terminal-container">
+  <div class="terminal-container" :style="containerStyle">
     <iframe 
       ref="terminalFrame"
       class="terminal-iframe"
@@ -12,10 +12,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 
 const terminalFrame = ref(null)
 const terminalUrl = ref('')
+const keyboardHeight = ref(0)
+
+// Compute container style based on keyboard height
+const containerStyle = computed(() => ({
+  height: keyboardHeight.value > 0 ? `calc(100% - ${keyboardHeight.value}px)` : '100%'
+}))
 
 
 const onIframeLoad = () => {
@@ -80,90 +86,84 @@ const onIframeLoad = () => {
   }
 }
 
+// Detect keyboard height
+const detectKeyboard = () => {
+  if (window.visualViewport) {
+    const windowHeight = window.innerHeight
+    const viewportHeight = window.visualViewport.height
+    const kbHeight = windowHeight - viewportHeight
+    
+    // Only update if there's a significant change (keyboard showing/hiding)
+    if (kbHeight > 50) {
+      keyboardHeight.value = kbHeight
+    } else {
+      keyboardHeight.value = 0
+    }
+  }
+}
+
 onMounted(() => {
   // Use the same host but ttyd port
   const protocol = window.location.protocol
   const hostname = window.location.hostname
   terminalUrl.value = `${protocol}//${hostname}:8021`
   
-  // Prevent ALL scrolling
-  const preventAllScrolling = (e) => {
+  // Detect keyboard on viewport changes
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', detectKeyboard)
+    window.visualViewport.addEventListener('scroll', detectKeyboard)
+  }
+  
+  // Also listen to regular resize
+  window.addEventListener('resize', detectKeyboard)
+  
+  // Prevent scrolling
+  const preventScroll = (e) => {
     e.preventDefault()
-    e.stopPropagation()
     return false
   }
   
-  // Block every possible scroll event
-  ['scroll', 'touchmove', 'wheel', 'touchstart'].forEach(event => {
-    document.addEventListener(event, preventAllScrolling, { passive: false, capture: true })
-    window.addEventListener(event, preventAllScrolling, { passive: false, capture: true })
-    document.body.addEventListener(event, preventAllScrolling, { passive: false, capture: true })
-  })
+  document.addEventListener('touchmove', preventScroll, { passive: false })
+  document.addEventListener('scroll', preventScroll, { passive: false })
   
-  // Force position to 0,0
-  const lockPosition = () => {
-    window.scrollTo(0, 0)
-    document.body.scrollTop = 0
-    document.documentElement.scrollTop = 0
-    if (window.visualViewport) {
-      window.scrollTo(0, -window.visualViewport.offsetTop)
-    }
-  }
-  
-  // Lock on any event that might cause scroll
-  window.addEventListener('resize', lockPosition)
-  window.addEventListener('orientationchange', lockPosition)
+  // Keep at top
+  window.scrollTo(0, 0)
+})
+
+onUnmounted(() => {
   if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', lockPosition)
-    window.visualViewport.addEventListener('scroll', lockPosition)
+    window.visualViewport.removeEventListener('resize', detectKeyboard)
+    window.visualViewport.removeEventListener('scroll', detectKeyboard)
   }
-  
-  // Initial lock
-  lockPosition()
-  
-  // Aggressive position locking
-  setInterval(lockPosition, 100)
+  window.removeEventListener('resize', detectKeyboard)
 })
 </script>
 
 <style scoped>
 .terminal-container {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  max-width: 100% !important;
-  max-height: 100% !important;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  /* Height is dynamically set via style prop */
   background: #000;
-  overflow: hidden !important;
-  overscroll-behavior: none !important;
-  overscroll-behavior-y: none !important;
-  overscroll-behavior-x: none !important;
-  touch-action: none !important;
-  -webkit-overflow-scrolling: none !important;
-  transform: translate3d(0,0,0);
-  z-index: 9999;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  transition: height 0.3s ease;
 }
 
 .terminal-iframe {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  max-width: 100% !important;
-  max-height: 100% !important;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   border: none;
   background: #000;
-  overflow: hidden !important;
-  overscroll-behavior: none !important;
-  transform: translate3d(0,0,0);
-  z-index: 10000;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 /* Safe area support */
