@@ -1,5 +1,5 @@
 <template>
-  <div class="terminal-container">
+  <div class="terminal-container" :style="containerStyle">
     <iframe 
       ref="terminalFrame"
       class="terminal-iframe"
@@ -12,10 +12,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 
 const terminalFrame = ref(null)
 const terminalUrl = ref('')
+const viewportHeight = ref(window.innerHeight)
+
+// Dynamically calculate container height based on actual viewport
+const containerStyle = computed(() => ({
+  height: `${viewportHeight.value}px`
+}))
 
 
 const onIframeLoad = () => {
@@ -80,11 +86,26 @@ const onIframeLoad = () => {
   }
 }
 
+// Update viewport height on resize
+const updateViewportHeight = () => {
+  viewportHeight.value = window.innerHeight
+}
+
 onMounted(() => {
   // Use the same host but ttyd port
   const protocol = window.location.protocol
   const hostname = window.location.hostname
   terminalUrl.value = `${protocol}//${hostname}:8021`
+  
+  // Track viewport changes
+  window.addEventListener('resize', updateViewportHeight)
+  
+  // Use visualViewport for more accurate mobile keyboard detection
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      viewportHeight.value = window.visualViewport.height
+    })
+  }
   
   // Prevent ALL scrolling and touch movement
   const preventScroll = (e) => {
@@ -97,24 +118,18 @@ onMounted(() => {
   document.addEventListener('touchmove', preventScroll, { passive: false })
   document.addEventListener('scroll', preventScroll, { passive: false })
   window.addEventListener('scroll', preventScroll, { passive: false })
-  document.body.addEventListener('scroll', preventScroll, { passive: false })
   
   // Lock scroll position
   window.scrollTo(0, 0)
   document.body.scrollTop = 0
   document.documentElement.scrollTop = 0
-  
-  // Prevent scrolling on window focus (keyboard appearance)
-  window.addEventListener('focus', () => {
-    window.scrollTo(0, 0)
-  }, true)
-  
-  // Reset scroll on any resize
-  window.addEventListener('resize', () => {
-    window.scrollTo(0, 0)
-    document.body.scrollTop = 0
-    document.documentElement.scrollTop = 0
-  })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateViewportHeight)
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', updateViewportHeight)
+  }
 })
 </script>
 
@@ -123,11 +138,8 @@ onMounted(() => {
   position: fixed;
   top: 0 !important;
   left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
   width: 100vw !important;
-  height: 100vh !important;
-  height: 100dvh !important;
+  /* Height is set dynamically via style prop */
   background: #000;
   overflow: hidden !important;
   /* Prevent bouncing and scrolling */
@@ -142,9 +154,9 @@ onMounted(() => {
   position: absolute;
   top: 0 !important;
   left: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  height: 100dvh !important;
+  width: 100% !important;
+  /* Fill parent container height */
+  height: 100% !important;
   border: none;
   display: block;
   background: #000;
