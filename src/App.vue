@@ -80,82 +80,95 @@ const onIframeLoad = () => {
   }
 }
 
-// Set CSS variable for actual viewport height
-const setViewportHeight = () => {
-  // Use visualViewport for accurate height when keyboard is shown
-  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight
-  document.documentElement.style.setProperty('--app-height', `${vh}px`)
-}
-
 onMounted(() => {
   // Use the same host but ttyd port
   const protocol = window.location.protocol
   const hostname = window.location.hostname
   terminalUrl.value = `${protocol}//${hostname}:8021`
   
-  // Set initial viewport height
-  setViewportHeight()
-  
-  // Update on resize
-  window.addEventListener('resize', setViewportHeight)
-  
-  // Use visualViewport for better mobile keyboard detection
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', setViewportHeight)
-    window.visualViewport.addEventListener('scroll', setViewportHeight)
-  }
-  
-  // Prevent scrolling
-  const preventScroll = (e) => {
+  // Prevent ALL scrolling
+  const preventAllScrolling = (e) => {
     e.preventDefault()
+    e.stopPropagation()
     return false
   }
   
-  document.addEventListener('touchmove', preventScroll, { passive: false })
-  document.addEventListener('scroll', preventScroll, { passive: false })
+  // Block every possible scroll event
+  ['scroll', 'touchmove', 'wheel', 'touchstart'].forEach(event => {
+    document.addEventListener(event, preventAllScrolling, { passive: false, capture: true })
+    window.addEventListener(event, preventAllScrolling, { passive: false, capture: true })
+    document.body.addEventListener(event, preventAllScrolling, { passive: false, capture: true })
+  })
   
-  // Always stay at top
-  window.scrollTo(0, 0)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', setViewportHeight)
-  if (window.visualViewport) {
-    window.visualViewport.removeEventListener('resize', setViewportHeight)
-    window.visualViewport.removeEventListener('scroll', setViewportHeight)
+  // Force position to 0,0
+  const lockPosition = () => {
+    window.scrollTo(0, 0)
+    document.body.scrollTop = 0
+    document.documentElement.scrollTop = 0
+    if (window.visualViewport) {
+      window.scrollTo(0, -window.visualViewport.offsetTop)
+    }
   }
+  
+  // Lock on any event that might cause scroll
+  window.addEventListener('resize', lockPosition)
+  window.addEventListener('orientationchange', lockPosition)
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', lockPosition)
+    window.visualViewport.addEventListener('scroll', lockPosition)
+  }
+  
+  // Initial lock
+  lockPosition()
+  
+  // Aggressive position locking
+  setInterval(lockPosition, 100)
 })
 </script>
 
 <style scoped>
 .terminal-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  /* Use CSS variable that updates with visualViewport */
-  height: var(--app-height, 100vh);
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
   background: #000;
-  overflow: hidden;
-  overscroll-behavior: none;
-  touch-action: none;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  overscroll-behavior-y: none !important;
+  overscroll-behavior-x: none !important;
+  touch-action: none !important;
+  -webkit-overflow-scrolling: none !important;
+  transform: translate3d(0,0,0);
+  z-index: 9999;
 }
 
 .terminal-iframe {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
   border: none;
   background: #000;
-  overflow: hidden;
-  overscroll-behavior: none;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  transform: translate3d(0,0,0);
+  z-index: 10000;
 }
 
 /* Safe area support */
 @supports (padding: env(safe-area-inset-top)) {
-  .terminal-container {
+  .terminal-iframe {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
