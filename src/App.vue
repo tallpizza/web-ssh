@@ -1,5 +1,5 @@
 <template>
-  <div class="terminal-container" :style="containerStyle">
+  <div class="terminal-container">
     <iframe 
       ref="terminalFrame"
       class="terminal-iframe"
@@ -12,16 +12,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const terminalFrame = ref(null)
 const terminalUrl = ref('')
-const viewportHeight = ref(window.innerHeight)
-
-// Dynamically calculate container height based on actual viewport
-const containerStyle = computed(() => ({
-  height: `${viewportHeight.value}px`
-}))
 
 
 const onIframeLoad = () => {
@@ -86,9 +80,11 @@ const onIframeLoad = () => {
   }
 }
 
-// Update viewport height on resize
-const updateViewportHeight = () => {
-  viewportHeight.value = window.innerHeight
+// Set CSS variable for actual viewport height
+const setViewportHeight = () => {
+  // Use visualViewport for accurate height when keyboard is shown
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight
+  document.documentElement.style.setProperty('--app-height', `${vh}px`)
 }
 
 onMounted(() => {
@@ -97,38 +93,36 @@ onMounted(() => {
   const hostname = window.location.hostname
   terminalUrl.value = `${protocol}//${hostname}:8021`
   
-  // Track viewport changes
-  window.addEventListener('resize', updateViewportHeight)
+  // Set initial viewport height
+  setViewportHeight()
   
-  // Use visualViewport for more accurate mobile keyboard detection
+  // Update on resize
+  window.addEventListener('resize', setViewportHeight)
+  
+  // Use visualViewport for better mobile keyboard detection
   if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-      viewportHeight.value = window.visualViewport.height
-    })
+    window.visualViewport.addEventListener('resize', setViewportHeight)
+    window.visualViewport.addEventListener('scroll', setViewportHeight)
   }
   
-  // Prevent ALL scrolling and touch movement
+  // Prevent scrolling
   const preventScroll = (e) => {
     e.preventDefault()
-    e.stopPropagation()
     return false
   }
   
-  // Block all scroll-related events
   document.addEventListener('touchmove', preventScroll, { passive: false })
   document.addEventListener('scroll', preventScroll, { passive: false })
-  window.addEventListener('scroll', preventScroll, { passive: false })
   
-  // Lock scroll position
+  // Always stay at top
   window.scrollTo(0, 0)
-  document.body.scrollTop = 0
-  document.documentElement.scrollTop = 0
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', updateViewportHeight)
+  window.removeEventListener('resize', setViewportHeight)
   if (window.visualViewport) {
-    window.visualViewport.removeEventListener('resize', updateViewportHeight)
+    window.visualViewport.removeEventListener('resize', setViewportHeight)
+    window.visualViewport.removeEventListener('scroll', setViewportHeight)
   }
 })
 </script>
@@ -136,40 +130,32 @@ onUnmounted(() => {
 <style scoped>
 .terminal-container {
   position: fixed;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  /* Height is set dynamically via style prop */
+  top: 0;
+  left: 0;
+  width: 100vw;
+  /* Use CSS variable that updates with visualViewport */
+  height: var(--app-height, 100vh);
   background: #000;
-  overflow: hidden !important;
-  /* Prevent bouncing and scrolling */
-  overscroll-behavior: none !important;
-  overscroll-behavior-y: none !important;
-  -webkit-overflow-scrolling: none !important;
-  touch-action: none !important;
-  transform: translate3d(0, 0, 0); /* Force GPU acceleration */
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
 .terminal-iframe {
   position: absolute;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  /* Fill parent container height */
-  height: 100% !important;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   border: none;
-  display: block;
   background: #000;
-  /* Prevent scrolling within iframe */
-  overflow: hidden !important;
-  overscroll-behavior: none !important;
-  pointer-events: auto;
-  transform: translate3d(0, 0, 0); /* Force GPU acceleration */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
-/* Safe area support - apply to iframe instead of container */
+/* Safe area support */
 @supports (padding: env(safe-area-inset-top)) {
-  .terminal-iframe {
+  .terminal-container {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
