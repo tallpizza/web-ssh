@@ -3,13 +3,10 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 8020;
-
-// Serve static files
-app.use(express.static('public'));
+const PORT = process.env.PORT || 8022; // Change to 8022 for API server
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', ttyd: ttydProcess ? 'running' : 'stopped' });
 });
 
